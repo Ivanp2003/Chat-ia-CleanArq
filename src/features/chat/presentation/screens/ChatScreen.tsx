@@ -1,4 +1,5 @@
-import React, { useRef, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -8,16 +9,44 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MessageBubble } from "../components/MessageBubble";
 import { useChat } from "../hooks/useChat";
+import { useTextToSpeech } from "../hooks/useTextToSpeech";
+import { useVoiceRecognition } from "../hooks/useVoiceRecognition";
 
 export const ChatScreen: React.FC = () => {
   const [inputText, setInputText] = useState("");
+  const [ttsEnabled, setTtsEnabled] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const { messages, isLoading, error, sendMessage, clearChat } = useChat();
+  const {
+    isListening,
+    recognizedText,
+    error: voiceError,
+    startListening,
+    stopListening,
+  } = useVoiceRecognition();
+  const { speak } = useTextToSpeech();
+
+  // Update input text when voice recognition returns results
+  useEffect(() => {
+    if (recognizedText && !isListening) {
+      setInputText((prev) => prev + (prev ? " " : "") + recognizedText);
+    }
+  }, [recognizedText, isListening]);
+
+  // Speak AI responses when TTS is enabled
+  useEffect(() => {
+    if (ttsEnabled && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === "assistant") {
+        speak(lastMessage.content);
+      }
+    }
+  }, [messages, ttsEnabled, speak]);
 
   const handleSend = async () => {
     if (!inputText.trim() || isLoading) return;
@@ -27,13 +56,33 @@ export const ChatScreen: React.FC = () => {
     flatListRef.current?.scrollToEnd({ animated: true });
   };
 
+  const handleVoiceToggle = async () => {
+    if (isListening) {
+      await stopListening();
+    } else {
+      await startListening();
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Chat con Gemini</Text>
-        <TouchableOpacity onPress={clearChat} style={styles.clearBtn}>
-          <Text style={styles.clearText}>Limpiar</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            onPress={() => setTtsEnabled(!ttsEnabled)}
+            style={[styles.ttsBtn, ttsEnabled && styles.ttsBtnActive]}
+          >
+            <Ionicons
+              name={ttsEnabled ? "volume-high" : "volume-mute"}
+              size={20}
+              color={ttsEnabled ? "#2563EB" : "#6B7280"}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={clearChat} style={styles.clearBtn}>
+            <Text style={styles.clearText}>Limpiar</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       <KeyboardAvoidingView
         style={styles.flex}
@@ -59,7 +108,25 @@ export const ChatScreen: React.FC = () => {
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
+        {voiceError && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{voiceError}</Text>
+          </View>
+        )}
         <View style={styles.inputContainer}>
+          <TouchableOpacity
+            style={[
+              styles.voiceButton,
+              isListening && styles.voiceButtonActive,
+            ]}
+            onPress={handleVoiceToggle}
+          >
+            <Ionicons
+              name={isListening ? "mic-circle" : "mic"}
+              size={24}
+              color={isListening ? "#EF4444" : "#6B7280"}
+            />
+          </TouchableOpacity>
           <TextInput
             style={styles.input}
             value={inputText}
@@ -98,8 +165,20 @@ const styles = StyleSheet.create({
     borderBottomColor: "#E5E7EB",
   },
   headerTitle: { fontSize: 18, fontWeight: "600", color: "#111827" },
+  headerButtons: { flexDirection: "row", alignItems: "center", gap: 8 },
   clearBtn: { paddingHorizontal: 12, paddingVertical: 6 },
   clearText: { color: "#EF4444", fontSize: 14 },
+  ttsBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+  },
+  ttsBtnActive: {
+    backgroundColor: "#DBEAFE",
+  },
   messagesList: { padding: 16, paddingBottom: 100 },
   loadingContainer: {
     flexDirection: "row",
@@ -149,4 +228,15 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: { backgroundColor: "#93C5FD" },
   sendIcon: { color: "#FFFFFF", fontWeight: "600", fontSize: 14 },
+  voiceButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+  },
+  voiceButtonActive: {
+    backgroundColor: "#FEE2E2",
+  },
 });
