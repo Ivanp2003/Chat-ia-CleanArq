@@ -1,85 +1,11 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import Markdown from "react-native-markdown-display";
 import { Message } from "../../domain/entities/Message";
 
 interface Props {
   message: Message;
 }
-
-const parseMarkdown = (text: string): React.ReactNode[] => {
-  const lines = text.split("\n");
-  const result: React.ReactNode[] = [];
-
-  lines.forEach((line, index) => {
-    if (line.startsWith("### ")) {
-      result.push(
-        <Text key={`h3-${index}`} style={markdownStyles.heading3}>
-          {line.replace("### ", "")}
-        </Text>,
-      );
-    } else if (line.startsWith("## ")) {
-      result.push(
-        <Text key={`h2-${index}`} style={markdownStyles.heading2}>
-          {line.replace("## ", "")}
-        </Text>,
-      );
-    } else if (line.startsWith("# ")) {
-      result.push(
-        <Text key={`h1-${index}`} style={markdownStyles.heading1}>
-          {line.replace("# ", "")}
-        </Text>,
-      );
-    } else if (line.startsWith("- ") || line.startsWith("* ")) {
-      result.push(
-        <Text key={`li-${index}`} style={markdownStyles.listItem}>
-          {"  • " + line.replace(/^[*-] /, "")}
-        </Text>,
-      );
-    } else if (line.startsWith("```")) {
-      // Skip code block markers
-    } else {
-      // Parse inline markdown with simple replacement
-      let processedLine = line;
-
-      // Replace **bold** with styled text
-      const parts: React.ReactNode[] = [];
-      const boldRegex = /\*\*(.+?)\*\*/g;
-      let lastIndex = 0;
-      let match;
-
-      while ((match = boldRegex.exec(processedLine)) !== null) {
-        // Add text before the match
-        if (match.index > lastIndex) {
-          parts.push(processedLine.substring(lastIndex, match.index));
-        }
-        // Add bold text
-        parts.push(
-          <Text
-            key={`bold-${index}-${parts.length}`}
-            style={markdownStyles.strong}
-          >
-            {match[1]}
-          </Text>,
-        );
-        lastIndex = match.index + match[0].length;
-      }
-
-      // Add remaining text
-      if (lastIndex < processedLine.length) {
-        parts.push(processedLine.substring(lastIndex));
-      }
-
-      // If no bold found, just add the line
-      if (parts.length === 0) {
-        result.push(<Text key={`line-${index}`}>{line}</Text>);
-      } else {
-        result.push(<Text key={`line-${index}`}>{parts}</Text>);
-      }
-    }
-  });
-
-  return result;
-};
 
 export const MessageBubble: React.FC<Props> = ({ message }) => {
   const isUser = message.role === "user";
@@ -96,9 +22,7 @@ export const MessageBubble: React.FC<Props> = ({ message }) => {
         {isUser ? (
           <Text style={[styles.text, styles.userText]}>{message.content}</Text>
         ) : (
-          <Text style={markdownStyles.body}>
-            {parseMarkdown(message.content)}
-          </Text>
+          <Markdown style={markdownStyles}>{message.content}</Markdown>
         )}
       </View>
       <Text style={styles.timestamp}>
@@ -161,7 +85,6 @@ const markdownStyles = {
     marginVertical: 8,
   },
   bullet_list: { marginBottom: 8 },
-  list_item: { flexDirection: "row" as const, marginBottom: 4 },
-  listItem: { color: "#1E293B" },
+  list_item: { marginBottom: 4 },
   bullet: { marginRight: 8, color: "#1E293B" },
 };
